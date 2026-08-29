@@ -38,3 +38,19 @@ class ResourceLoader:
             for filename in os.listdir(world1_path):
                 if filename.endswith('.png'):
                     cls.load_image(os.path.join('world1', filename))
+
+    @classmethod
+    def preload_heros(cls):
+        heros_path = os.path.join(cls.BASE_PATH, 'heros')
+        if os.path.exists(heros_path):
+            for filename in os.listdir(heros_path):
+                if filename.endswith('.png'):
+                    cls.load_image(os.path.join('heros', filename))
+
+    @classmethod
+    def preload_all_worlds(cls):
+        all_worlds_path = os.path.join(cls.BASE_PATH, 'all_worlds')
+        if os.path.exists(all_worlds_path):
+            for filename in os.listdir(all_worlds_path):
+                if filename.endswith('.png'):
+                    cls.load_image(os.path.join('all_worlds', filename))
