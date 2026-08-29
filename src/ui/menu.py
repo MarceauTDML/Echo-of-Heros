@@ -13,16 +13,35 @@ class MainMenu:
         self.button_font = pygame.font.SysFont('arial', 40, bold=True)
         
         self.title_text = self.title_font.render(TITLE, True, (255, 255, 255))
-        self.title_rect = self.title_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 3))
+        self.title_rect = self.title_text.get_rect()
         
-        btn_width = 250
-        btn_height = 70
-        self.play_button = pygame.Rect(SCREEN_WIDTH // 2 - btn_width // 2, SCREEN_HEIGHT // 2, btn_width, btn_height)
-        self.shop_button = pygame.Rect(SCREEN_WIDTH // 2 - btn_width // 2, SCREEN_HEIGHT // 2 + 100, btn_width, btn_height)
-        self.editor_button = pygame.Rect(SCREEN_WIDTH // 2 - btn_width // 2, SCREEN_HEIGHT // 2 + 200, btn_width, btn_height)
-        self.quit_button = pygame.Rect(SCREEN_WIDTH // 2 - btn_width // 2, SCREEN_HEIGHT // 2 + 300, btn_width, btn_height)
+        self.btn_width = 250
+        self.btn_height = 70
+        self.play_button = pygame.Rect(0, 0, self.btn_width, self.btn_height)
+        self.shop_button = pygame.Rect(0, 0, self.btn_width, self.btn_height)
+        self.editor_button = pygame.Rect(0, 0, self.btn_width, self.btn_height)
+        self.quit_button = pygame.Rect(0, 0, self.btn_width, self.btn_height)
+        
+    def _update_layout(self):
+        sw = self.display_surface.get_width()
+        sh = self.display_surface.get_height()
+        
+        self.title_rect.center = (sw // 2, sh // 3)
+        
+        self.play_button.centerx = sw // 2
+        self.play_button.y = sh // 2
+        
+        self.shop_button.centerx = sw // 2
+        self.shop_button.y = sh // 2 + 100
+        
+        self.editor_button.centerx = sw // 2
+        self.editor_button.y = sh // 2 + 200
+        
+        self.quit_button.centerx = sw // 2
+        self.quit_button.y = sh // 2 + 300
         
     def handle_events(self, event):
+        self._update_layout()
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
                 mouse_pos = pygame.mouse.get_pos()
@@ -38,6 +57,7 @@ class MainMenu:
         pass
 
     def draw(self):
+        self._update_layout()
         self.display_surface.fill(BG_COLOR)
         
         self.display_surface.blit(self.title_text, self.title_rect)

@@ -21,11 +21,11 @@ class ShopMenu:
         
         self._setup_grid()
 
-    def _setup_grid(self):
+    def _setup_grid(self, sw=SCREEN_WIDTH):
         self.cards.clear()
         card_w = 220
         card_h = 180
-        start_x = (SCREEN_WIDTH - (3 * card_w) - (2 * 50)) // 2
+        start_x = (sw - (3 * card_w) - (2 * 50)) // 2
         start_y = 100
         
         row, col = 0, 0
@@ -62,7 +62,12 @@ class ShopMenu:
                         self.player_data.buy_hero(card["id"], card["price"])
 
     def update(self, dt):
-        pass
+        sw = self.display_surface.get_width()
+        if len(self.cards) > 0 and hasattr(self, '_last_sw') and self._last_sw != sw:
+            self._setup_grid(sw)
+        elif not hasattr(self, '_last_sw'):
+            self._last_sw = sw
+            self._setup_grid(sw)
 
     def draw(self):
         self.display_surface.fill(BG_COLOR)
@@ -75,10 +80,10 @@ class ShopMenu:
         self.display_surface.blit(b_txt, b_txt.get_rect(center=self.back_btn.center))
         
         coins_txt = self.font.render(f"Pieces: {self.player_data.coins}", True, (255, 215, 0))
-        self.display_surface.blit(coins_txt, (SCREEN_WIDTH - 250, 25))
+        self.display_surface.blit(coins_txt, (self.display_surface.get_width() - 250, 25))
         
         title_txt = self.font.render("Boutique de Heros", True, (255, 255, 255))
-        self.display_surface.blit(title_txt, title_txt.get_rect(center=(SCREEN_WIDTH // 2, 50)))
+        self.display_surface.blit(title_txt, title_txt.get_rect(center=(self.display_surface.get_width() // 2, 50)))
         
         for card in self.cards:
             rect = card["rect"]

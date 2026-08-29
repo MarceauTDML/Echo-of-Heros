@@ -9,7 +9,8 @@ from src.core.player_data import PlayerData
 
 class Game:
     def __init__(self):
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.flags = pygame.RESIZABLE
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), self.flags)
         pygame.display.set_caption(TITLE)
         
         self.clock = pygame.time.Clock()
@@ -17,6 +18,7 @@ class Game:
         
         self.running = True
         self.state = "MENU"
+        self.is_fullscreen = False
         
         self.player_data = PlayerData()
         
@@ -42,8 +44,20 @@ class Game:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
+                
+            if event.type == pygame.VIDEORESIZE:
+                if not self.is_fullscreen:
+                    self.screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
             
             if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_F11:
+                    self.is_fullscreen = not self.is_fullscreen
+                    info = pygame.display.Info()
+                    if self.is_fullscreen:
+                        self.screen = pygame.display.set_mode((info.current_w, info.current_h), pygame.FULLSCREEN)
+                    else:
+                        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.RESIZABLE)
+                
                 if event.key == pygame.K_ESCAPE:
                     if self.state == "SHOP":
                         self.go_to_menu()

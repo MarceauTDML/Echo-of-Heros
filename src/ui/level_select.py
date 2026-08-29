@@ -15,8 +15,11 @@ class LevelSelectMenu:
         
         self.back_btn = pygame.Rect(20, 20, 120, 50)
         
+        self._setup_layout(SCREEN_WIDTH)
+        
+    def _setup_layout(self, sw):
         self.world_btns = []
-        start_x = 50
+        start_x = (sw - (5 * 120 + 4 * 30)) // 2
         start_y = 120
         for i in range(15):
             row = i // 5
@@ -25,7 +28,7 @@ class LevelSelectMenu:
             self.world_btns.append(rect)
             
         self.level_btns = []
-        l_start_x = 50
+        l_start_x = (sw - (4 * 120 + 3 * 30)) // 2
         l_start_y = 420
         for i in range(8):
             row = i // 4
@@ -53,7 +56,10 @@ class LevelSelectMenu:
                         return
 
     def update(self, dt):
-        pass
+        sw = self.display_surface.get_width()
+        if not hasattr(self, '_last_sw') or self._last_sw != sw:
+            self._setup_layout(sw)
+            self._last_sw = sw
 
     def draw(self):
         self.display_surface.fill(BG_COLOR)
@@ -66,10 +72,11 @@ class LevelSelectMenu:
         self.display_surface.blit(b_text, b_text.get_rect(center=self.back_btn.center))
         
         t_text = self.title_font.render("Sélection du Niveau (Éditeur)", True, (255, 255, 255))
-        self.display_surface.blit(t_text, (SCREEN_WIDTH // 2 - t_text.get_width() // 2, 20))
+        self.display_surface.blit(t_text, (self.display_surface.get_width() // 2 - t_text.get_width() // 2, 20))
         
         w_t = self.font.render("Choix du Monde (1-15):", True, (255, 255, 255))
-        self.display_surface.blit(w_t, (50, 80))
+        w_start_x = (self.display_surface.get_width() - (5 * 120 + 4 * 30)) // 2
+        self.display_surface.blit(w_t, (w_start_x, 80))
         
         for i, rect in enumerate(self.world_btns):
             world_num = i + 1
@@ -81,7 +88,8 @@ class LevelSelectMenu:
             self.display_surface.blit(text, text.get_rect(center=rect.center))
             
         l_t = self.font.render(f"Niveaux du Monde {self.selected_world} (1-8):", True, (255, 255, 255))
-        self.display_surface.blit(l_t, (50, 380))
+        l_start_x = (self.display_surface.get_width() - (4 * 120 + 3 * 30)) // 2
+        self.display_surface.blit(l_t, (l_start_x, 380))
         
         for i, rect in enumerate(self.level_btns):
             lvl_num = i + 1
