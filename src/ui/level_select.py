@@ -28,11 +28,11 @@ class LevelSelectMenu:
             self.world_btns.append(rect)
             
         self.level_btns = []
-        l_start_x = (sw - (4 * 120 + 3 * 30)) // 2
+        l_start_x = (sw - (3 * 120 + 2 * 30)) // 2
         l_start_y = 420
-        for i in range(8):
-            row = i // 4
-            col = i % 4
+        for i in range(3):
+            row = 0
+            col = i
             rect = pygame.Rect(l_start_x + col * 150, l_start_y + row * 80, 120, 50)
             self.level_btns.append(rect)
 
@@ -87,8 +87,8 @@ class LevelSelectMenu:
             text = self.font.render(f"Monde {world_num}", True, (255, 255, 255))
             self.display_surface.blit(text, text.get_rect(center=rect.center))
             
-        l_t = self.font.render(f"Niveaux du Monde {self.selected_world} (1-8):", True, (255, 255, 255))
-        l_start_x = (self.display_surface.get_width() - (4 * 120 + 3 * 30)) // 2
+        l_t = self.font.render(f"Niveaux du Monde {self.selected_world} (1-3):", True, (255, 255, 255))
+        l_start_x = (self.display_surface.get_width() - (3 * 120 + 2 * 30)) // 2
         self.display_surface.blit(l_t, (l_start_x, 380))
         
         for i, rect in enumerate(self.level_btns):
