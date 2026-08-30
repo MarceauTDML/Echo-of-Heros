@@ -69,8 +69,14 @@ class EditorState:
         self.enemy_animations = {}
         self.enemies_error_msg = ""
         self.enemy_anim_timer = 0
+        
+        self.decors = []
+        self.decors_animations = {}
+        self.decors_error_msg = ""
+        
         self._load_tiles()
         self._load_entities()
+        self._load_decors()
         
     def _load_tiles(self):
         self.tiles = []
@@ -152,6 +158,79 @@ class EditorState:
                     
         except Exception as e:
             self.enemies_error_msg = f"Erreur de lecture: {e}"
+
+    def _load_decors(self):
+        self.decors = []
+        self.decors_animations = {}
+        self.decors_error_msg = ""
+        
+        all_worlds_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'assets', 'all_worlds'))
+        if os.path.exists(all_worlds_path):
+            try:
+                coin_files = []
+                for file in os.listdir(all_worlds_path):
+                    if file.startswith('Coins') and file.endswith('.png'):
+                        coin_files.append(file)
+                if coin_files:
+                    coin_files.sort()
+                    frames = []
+                    for file in coin_files:
+                        try:
+                            img = pygame.image.load(os.path.join(all_worlds_path, file)).convert_alpha()
+                            frames.append(img)
+                        except Exception:
+                            pass
+                    if frames:
+                        self.decors_animations["Coins"] = frames
+            except Exception:
+                pass
+                
+        base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'assets', f'world{self.world}', 'decors'))
+        if not os.path.exists(base_path):
+            self.decors_error_msg = f"Le dossier 'assets/world{self.world}/decors' n'existe pas encore."
+            return
+            
+        try:
+            anim_temp = {}
+            for file in os.listdir(base_path):
+                if file.endswith('.png'):
+                    name_without_ext = file[:-4]
+                    if '_' in name_without_ext:
+                        base_name, frame = name_without_ext.rsplit('_', 1)
+                        if 'Crystal Blue' in base_name:
+                            if base_name not in anim_temp:
+                                anim_temp[base_name] = []
+                            anim_temp[base_name].append(file)
+                        else:
+                            if frame == '1':
+                                try:
+                                    img = pygame.image.load(os.path.join(base_path, file)).convert_alpha()
+                                    self.decors.append((name_without_ext, img))
+                                except Exception:
+                                    pass
+                    else:
+                        try:
+                            img = pygame.image.load(os.path.join(base_path, file)).convert_alpha()
+                            self.decors.append((name_without_ext, img))
+                        except Exception:
+                            pass
+                            
+            for name, files in anim_temp.items():
+                files.sort()
+                frames = []
+                for file in files:
+                    try:
+                        img = pygame.image.load(os.path.join(base_path, file)).convert_alpha()
+                        frames.append(img)
+                    except Exception:
+                        pass
+                if frames:
+                    self.decors_animations[name] = frames
+                    
+        except Exception as e:
+            self.decors_error_msg = f"Erreur de lecture: {e}"
+            
+
         
     def load_level(self, world, level):
         self.world = world
@@ -159,6 +238,7 @@ class EditorState:
         self.camera_offset = pygame.math.Vector2(0, 0)
         self._load_tiles()
         self._load_entities()
+        self._load_decors()
 
     def _update_layout(self):
         sw = self.display_surface.get_width()
@@ -444,6 +524,79 @@ class EditorState:
                         pygame.draw.rect(self.display_surface, (100, 100, 100), (tx, ty, self.grid_size, self.grid_size), 1)
                         
                     self.display_surface.set_clip(old_clip)
+                    
+            elif self.active_sub_tab == "Décors":
+                all_decors = list(self.decors) + [(name, frames) for name, frames in self.decors_animations.items()]
+                cols = 3
+                cell_size = (self.sidebar_w - 20) // cols
+                
+                total_height = 0
+                if all_decors:
+                    total_rows = (len(all_decors) - 1) // cols + 1
+                    total_height = total_rows * cell_size
+                    
+                if self.decors_error_msg:
+                    total_height += 60
+                    
+                max_scroll = max(0, total_height - (sh - 100))
+                if self.sidebar_scroll > max_scroll:
+                    self.sidebar_scroll = max_scroll
+                    
+                clip_rect = pygame.Rect(sw - self.sidebar_w, 80, self.sidebar_w, sh - 80)
+                old_clip = self.display_surface.get_clip()
+                self.display_surface.set_clip(clip_rect)
+                
+                x_start = sw - self.sidebar_w + 10
+                y_start = 100 - self.sidebar_scroll
+                
+                for idx, item in enumerate(all_decors):
+                    r = idx // cols
+                    c = idx % cols
+                    tx = x_start + c * cell_size
+                    ty = y_start + r * cell_size
+                    
+                    box_rect = pygame.Rect(tx, ty, cell_size, cell_size)
+                    pygame.draw.rect(self.display_surface, (50, 50, 50), box_rect)
+                    pygame.draw.rect(self.display_surface, (100, 100, 100), box_rect, 1)
+                    
+                    name = item[0]
+                    if isinstance(item[1], list):
+                        frames = item[1]
+                        frame_idx = int(self.enemy_anim_timer / 0.1) % len(frames)
+                        img = frames[frame_idx]
+                    else:
+                        img = item[1]
+                        
+                    img_w, img_h = img.get_size()
+                    max_dim = cell_size - 10
+                    scale = min(max_dim / img_w, max_dim / img_h)
+                    new_w, new_h = int(img_w * scale), int(img_h * scale)
+                    img = pygame.transform.scale(img, (new_w, new_h))
+                        
+                    img_rect = img.get_rect(center=box_rect.center)
+                    self.display_surface.blit(img, img_rect)
+                    
+                if self.decors_error_msg:
+                    err_font = pygame.font.SysFont('arial', 14, bold=True)
+                    words = self.decors_error_msg.split(' ')
+                    lines = []
+                    current_line = []
+                    for w in words:
+                        current_line.append(w)
+                        if err_font.size(' '.join(current_line))[0] > self.sidebar_w - 20:
+                            current_line.pop()
+                            lines.append(' '.join(current_line))
+                            current_line = [w]
+                    if current_line: lines.append(' '.join(current_line))
+                    
+                    err_y = y_start + ((len(all_decors) - 1) // cols + 1) * cell_size if all_decors else y_start
+                    
+                    for line in lines:
+                        surf = err_font.render(line, True, (255, 100, 100))
+                        self.display_surface.blit(surf, (x_start, err_y))
+                        err_y += 20
+                        
+                self.display_surface.set_clip(old_clip)
                     
             elif self.active_sub_tab == "Entités":
                 all_entities = list(self.hero_animations.items()) + list(self.enemy_animations.items())
