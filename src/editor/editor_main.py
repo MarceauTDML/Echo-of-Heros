@@ -1,4 +1,5 @@
 import pygame
+import os
 from src.settings import *
 
 class EditorState:
@@ -33,6 +34,7 @@ class EditorState:
         
         self.sidebar_rect = pygame.Rect(0, 0, 0, 0)
         self.sidebar_w = 0
+        self.sidebar_scroll = 0
         
         self.settings_btn = pygame.Rect(10, 0, 140, 40)
         self.show_settings = False
@@ -60,10 +62,35 @@ class EditorState:
         self.placed_gems = 0
         self.placed_enemies = 0
         
+        self.tiles = []
+        self.tiles_error_msg = ""
+        self._load_tiles()
+        
+    def _load_tiles(self):
+        self.tiles = []
+        self.tiles_error_msg = ""
+        base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'assets', f'world{self.world}', 'tiles'))
+        if not os.path.exists(base_path):
+            self.tiles_error_msg = f"Le dossier 'assets/world{self.world}/tiles' n'existe pas encore."
+            return
+            
+        try:
+            for file in os.listdir(base_path):
+                if file.endswith('.png'):
+                    try:
+                        img = pygame.image.load(os.path.join(base_path, file)).convert_alpha()
+                        img_scaled = pygame.transform.scale(img, (self.grid_size, self.grid_size))
+                        self.tiles.append((file, img_scaled))
+                    except Exception:
+                        pass
+        except Exception as e:
+            self.tiles_error_msg = f"Erreur de lecture: {e}"
+        
     def load_level(self, world, level):
         self.world = world
         self.level = level
         self.camera_offset = pygame.math.Vector2(0, 0)
+        self._load_tiles()
 
     def _update_layout(self):
         sw = self.display_surface.get_width()
@@ -162,6 +189,12 @@ class EditorState:
                         if self.active_input == 'w': self.map_w_str += event.unicode
                         else: self.map_h_str += event.unicode
             return
+
+        if event.type == pygame.MOUSEWHEEL:
+            mouse_pos = pygame.mouse.get_pos()
+            if self.sidebar_rect.collidepoint(mouse_pos):
+                self.sidebar_scroll -= event.y * 20
+                if self.sidebar_scroll < 0: self.sidebar_scroll = 0
 
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
@@ -289,6 +322,54 @@ class EditorState:
                 
                 txt = self.tab_font.render(tab, True, (255, 255, 255))
                 self.display_surface.blit(txt, txt.get_rect(center=rect.center))
+                
+            if self.active_sub_tab == "Blocs":
+                if self.tiles_error_msg:
+                    err_font = pygame.font.SysFont('arial', 14, bold=True)
+                    words = self.tiles_error_msg.split(' ')
+                    lines = []
+                    current_line = []
+                    for w in words:
+                        current_line.append(w)
+                        if err_font.size(' '.join(current_line))[0] > self.sidebar_w - 20:
+                            current_line.pop()
+                            lines.append(' '.join(current_line))
+                            current_line = [w]
+                    if current_line: lines.append(' '.join(current_line))
+                    
+                    t_y = 100
+                    for line in lines:
+                        surf = err_font.render(line, True, (255, 100, 100))
+                        self.display_surface.blit(surf, (sw - self.sidebar_w + 10, t_y))
+                        t_y += 20
+                else:
+                    cols = (self.sidebar_w - 20) // (self.grid_size + 10)
+                    if cols < 1: cols = 1
+                    
+                    if self.tiles:
+                        total_rows = (len(self.tiles) - 1) // cols + 1
+                        total_height = total_rows * (self.grid_size + 10)
+                        max_scroll = max(0, total_height - (sh - 100))
+                        if self.sidebar_scroll > max_scroll:
+                            self.sidebar_scroll = max_scroll
+                            
+                    clip_rect = pygame.Rect(sw - self.sidebar_w, 80, self.sidebar_w, sh - 80)
+                    old_clip = self.display_surface.get_clip()
+                    self.display_surface.set_clip(clip_rect)
+                    
+                    x_start = sw - self.sidebar_w + 10
+                    y_start = 100 - self.sidebar_scroll
+                    
+                    for idx, (filename, img) in enumerate(self.tiles):
+                        r = idx // cols
+                        c = idx % cols
+                        tx = x_start + c * (self.grid_size + 10)
+                        ty = y_start + r * (self.grid_size + 10)
+                        
+                        self.display_surface.blit(img, (tx, ty))
+                        pygame.draw.rect(self.display_surface, (100, 100, 100), (tx, ty, self.grid_size, self.grid_size), 1)
+                        
+                    self.display_surface.set_clip(old_clip)
             
         b_color = (200, 100, 100) if self.back_btn.collidepoint(mouse_pos) else (150, 50, 50)
         pygame.draw.rect(self.display_surface, b_color, self.back_btn, border_radius=5)
