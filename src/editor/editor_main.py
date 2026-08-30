@@ -1,6 +1,7 @@
 import pygame
 import os
 from src.settings import *
+from src.utils.data_manager import DataManager
 
 class EditorState:
     def __init__(self, display_surface, back_callback):
@@ -64,7 +65,12 @@ class EditorState:
         
         self.tiles = []
         self.tiles_error_msg = ""
+        self.hero_animations = {}
+        self.enemy_animations = {}
+        self.enemies_error_msg = ""
+        self.enemy_anim_timer = 0
         self._load_tiles()
+        self._load_entities()
         
     def _load_tiles(self):
         self.tiles = []
@@ -85,12 +91,74 @@ class EditorState:
                         pass
         except Exception as e:
             self.tiles_error_msg = f"Erreur de lecture: {e}"
+
+    def _load_entities(self):
+        self.hero_animations = {}
+        self.enemy_animations = {}
+        self.enemies_error_msg = ""
+        
+        hero_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'assets', 'heros'))
+        if os.path.exists(hero_path):
+            heroes_data = DataManager().load_json('heroes.json')
+            base_hero = None
+            for h_id, h_info in heroes_data.items():
+                if h_info.get('price') == 0:
+                    base_hero = h_id
+                    break
+                    
+            if base_hero:
+                temp_dict = {base_hero: []}
+                for file in os.listdir(hero_path):
+                    if file.startswith(base_hero) and '_Idle_' in file and file.endswith('.png'):
+                        temp_dict[base_hero].append(file)
+                
+                temp_dict[base_hero].sort()
+                frames = []
+                for file in temp_dict[base_hero]:
+                    try:
+                        img = pygame.image.load(os.path.join(hero_path, file)).convert_alpha()
+                        frames.append(img)
+                    except Exception:
+                        pass
+                if frames:
+                    display_name = heroes_data[base_hero].get('name', base_hero)
+                    self.hero_animations[display_name] = frames
+                    
+        base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'assets', f'world{self.world}', 'enemies'))
+        if not os.path.exists(base_path):
+            self.enemies_error_msg = f"Le dossier 'assets/world{self.world}/enemies' n'existe pas encore."
+            return
+            
+        try:
+            temp_dict = {}
+            for file in os.listdir(base_path):
+                if file.endswith('.png') and '_Idle_' in file:
+                    enemy_name = file.split('_Idle_')[0]
+                    if enemy_name not in temp_dict:
+                        temp_dict[enemy_name] = []
+                    temp_dict[enemy_name].append(file)
+            
+            for name, files in temp_dict.items():
+                files.sort()
+                frames = []
+                for file in files:
+                    try:
+                        img = pygame.image.load(os.path.join(base_path, file)).convert_alpha()
+                        frames.append(img)
+                    except Exception:
+                        pass
+                if frames:
+                    self.enemy_animations[name] = frames
+                    
+        except Exception as e:
+            self.enemies_error_msg = f"Erreur de lecture: {e}"
         
     def load_level(self, world, level):
         self.world = world
         self.level = level
         self.camera_offset = pygame.math.Vector2(0, 0)
         self._load_tiles()
+        self._load_entities()
 
     def _update_layout(self):
         sw = self.display_surface.get_width()
@@ -211,13 +279,17 @@ class EditorState:
                 
                 for i, rect in enumerate(self.main_tab_rects):
                     if rect.collidepoint(mouse_pos):
-                        self.active_main_tab = self.main_tabs[i]
+                        if self.active_main_tab != self.main_tabs[i]:
+                            self.active_main_tab = self.main_tabs[i]
+                            self.sidebar_scroll = 0
                         return
                         
                 if self.active_main_tab == "Jeu":
                     for i, rect in enumerate(self.sub_tab_rects):
                         if rect.collidepoint(mouse_pos):
-                            self.active_sub_tab = self.sub_tabs[i]
+                            if self.active_sub_tab != self.sub_tabs[i]:
+                                self.active_sub_tab = self.sub_tabs[i]
+                                self.sidebar_scroll = 0
                             return
         
         if event.type == pygame.KEYDOWN:
@@ -225,6 +297,8 @@ class EditorState:
                 self.back_callback()
 
     def update(self, dt):
+        self.enemy_anim_timer += dt
+        
         if self.show_settings:
             if self.held_arrow:
                 self.arrow_timer -= dt
@@ -370,6 +444,77 @@ class EditorState:
                         pygame.draw.rect(self.display_surface, (100, 100, 100), (tx, ty, self.grid_size, self.grid_size), 1)
                         
                     self.display_surface.set_clip(old_clip)
+                    
+            elif self.active_sub_tab == "Entités":
+                all_entities = list(self.hero_animations.items()) + list(self.enemy_animations.items())
+                
+                total_height = len(all_entities) * 150
+                if self.enemies_error_msg:
+                    total_height += 60
+                    
+                max_scroll = max(0, total_height - (sh - 100))
+                if self.sidebar_scroll > max_scroll:
+                    self.sidebar_scroll = max_scroll
+                    
+                clip_rect = pygame.Rect(sw - self.sidebar_w, 80, self.sidebar_w, sh - 80)
+                old_clip = self.display_surface.get_clip()
+                self.display_surface.set_clip(clip_rect)
+                
+                x_start = sw - self.sidebar_w + 10
+                y_start = 100 - self.sidebar_scroll
+                
+                for entity_name, frames in all_entities:
+                    frame_idx = int(self.enemy_anim_timer / 0.1) % len(frames)
+                    img = frames[frame_idx]
+                    
+                    box_rect = pygame.Rect(x_start, y_start, self.sidebar_w - 20, 140)
+                    
+                    pygame.draw.rect(self.display_surface, (50, 50, 50), box_rect)
+                    if entity_name in self.hero_animations:
+                        pygame.draw.rect(self.display_surface, (100, 200, 100), box_rect, 2)
+                    else:
+                        pygame.draw.rect(self.display_surface, (100, 100, 100), box_rect, 2)
+                    
+                    name_surf = self.tab_font.render(entity_name, True, (255, 255, 255))
+                    self.display_surface.blit(name_surf, (x_start + 10, y_start + 10))
+                    
+                    img_w, img_h = img.get_size()
+                    target_h = 90
+                    scale = target_h / img_h
+                    
+                    new_w, new_h = int(img_w * scale), int(img_h * scale)
+                    
+                    max_w = box_rect.width - 20
+                    if new_w > max_w:
+                        scale_w = max_w / new_w
+                        new_w, new_h = int(new_w * scale_w), int(new_h * scale_w)
+                        
+                    img = pygame.transform.scale(img, (new_w, new_h))
+                        
+                    img_rect = img.get_rect(center=(box_rect.centerx, box_rect.centery + 15))
+                    self.display_surface.blit(img, img_rect)
+                    
+                    y_start += 150
+                    
+                if self.enemies_error_msg:
+                    err_font = pygame.font.SysFont('arial', 14, bold=True)
+                    words = self.enemies_error_msg.split(' ')
+                    lines = []
+                    current_line = []
+                    for w in words:
+                        current_line.append(w)
+                        if err_font.size(' '.join(current_line))[0] > self.sidebar_w - 20:
+                            current_line.pop()
+                            lines.append(' '.join(current_line))
+                            current_line = [w]
+                    if current_line: lines.append(' '.join(current_line))
+                    
+                    for line in lines:
+                        surf = err_font.render(line, True, (255, 100, 100))
+                        self.display_surface.blit(surf, (x_start, y_start))
+                        y_start += 20
+                        
+                self.display_surface.set_clip(old_clip)
             
         b_color = (200, 100, 100) if self.back_btn.collidepoint(mouse_pos) else (150, 50, 50)
         pygame.draw.rect(self.display_surface, b_color, self.back_btn, border_radius=5)
