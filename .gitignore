@@ -9,3 +9,5 @@ venv/
 env/
 
 save.json
+
+tiles_output/
