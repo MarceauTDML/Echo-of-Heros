@@ -63,6 +63,19 @@ class EditorState:
         self.placed_gems = 0
         self.placed_enemies = 0
         
+        self.layers = [
+            "Fonds (Parallaxe)",
+            "Décors de fond",
+            "Terrain & Objets",
+            "Entités",
+            "Premier plan"
+        ]
+        self.active_layer = "Terrain & Objets"
+        self.layer_rects = []
+        self.level_data = {layer: {} for layer in self.layers}
+        self.selected_item = None
+        self.item_rects = []
+        
         self.tiles = []
         self.tiles_error_msg = ""
         self.hero_animations = {}
@@ -259,6 +272,13 @@ class EditorState:
             for i, tab in enumerate(self.sub_tabs):
                 rect = pygame.Rect(sw - self.sidebar_w + i * sub_tab_w, 40, sub_tab_w, 40)
                 self.sub_tab_rects.append(rect)
+                
+        self.layer_rects = []
+        if self.active_main_tab == "Calques":
+            layer_h = 50
+            for i, layer in enumerate(self.layers):
+                rect = pygame.Rect(sw - self.sidebar_w + 10, 80 + i * (layer_h + 10), self.sidebar_w - 20, layer_h)
+                self.layer_rects.append(rect)
             
         self.settings_btn.y = sh - 50
         self.popup_rect.center = (sw // 2, sh // 2)
@@ -371,6 +391,19 @@ class EditorState:
                                 self.active_sub_tab = self.sub_tabs[i]
                                 self.sidebar_scroll = 0
                             return
+                            
+                    clip_rect = pygame.Rect(self.display_surface.get_width() - self.sidebar_w, 80, self.sidebar_w, self.display_surface.get_height() - 80)
+                    if clip_rect.collidepoint(mouse_pos):
+                        for item_rect, item_data in self.item_rects:
+                            if item_rect.collidepoint(mouse_pos):
+                                self.selected_item = item_data
+                                return
+                                
+                elif self.active_main_tab == "Calques":
+                    for i, rect in enumerate(self.layer_rects):
+                        if rect.collidepoint(mouse_pos):
+                            self.active_layer = self.layers[i]
+                            return
         
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
@@ -407,6 +440,25 @@ class EditorState:
             self.camera_offset.y += speed
         if keys[pygame.K_DOWN] or keys[pygame.K_s]:
             self.camera_offset.y -= speed
+            
+        mouse_pressed = pygame.mouse.get_pressed()
+        mouse_pos = pygame.mouse.get_pos()
+        sw = self.display_surface.get_width()
+        playable_w = sw - self.sidebar_w
+        
+        if mouse_pos[0] < playable_w and not self.show_settings:
+            world_x = mouse_pos[0] - self.camera_offset.x
+            world_y = mouse_pos[1] - self.camera_offset.y
+            grid_x = int(world_x // self.grid_size)
+            grid_y = int(world_y // self.grid_size)
+            
+            if 0 <= grid_x < self.map_width and 0 <= grid_y < self.map_height:
+                if mouse_pressed[0]:
+                    if self.selected_item:
+                        self.level_data[self.active_layer][(grid_x, grid_y)] = self.selected_item
+                elif mouse_pressed[2]:
+                    if (grid_x, grid_y) in self.level_data[self.active_layer]:
+                        del self.level_data[self.active_layer][(grid_x, grid_y)]
 
     def draw(self):
         self._update_layout()
@@ -440,11 +492,32 @@ class EditorState:
                 x_end = min(playable_w, map_screen_x_end)
                 if x_start < x_end:
                     pygame.draw.line(self.display_surface, (60, 60, 60), (x_start, screen_y), (x_end, screen_y))
-            
+                    
+        for layer_name in self.layers:
+            layer_dict = self.level_data[layer_name]
+            for (gx, gy), item in layer_dict.items():
+                screen_x = map_screen_x_start + gx * self.grid_size
+                screen_y = map_screen_y_start + gy * self.grid_size
+                if -self.grid_size <= screen_x <= playable_w and -self.grid_size <= screen_y <= sh:
+                    if len(item) == 3:
+                        itype, iname, iimg = item
+                        if isinstance(iimg, list):
+                            frame_idx = int(self.enemy_anim_timer / 0.1) % len(iimg)
+                            img_to_draw = iimg[frame_idx]
+                        else:
+                            img_to_draw = iimg
+                            
+                        if itype == "Blocs":
+                            self.display_surface.blit(img_to_draw, (screen_x, screen_y))
+                        elif itype == "Décors" or itype == "Entités":
+                            r = img_to_draw.get_rect(midbottom=(screen_x + self.grid_size // 2, screen_y + self.grid_size))
+                            self.display_surface.blit(img_to_draw, r)
+                    
         pygame.draw.rect(self.display_surface, (30, 30, 30), self.sidebar_rect)
         pygame.draw.line(self.display_surface, (100, 100, 100), (sw - self.sidebar_w, 0), (sw - self.sidebar_w, sh), 2)
         
         mouse_pos = pygame.mouse.get_pos()
+        self.item_rects = []
         
         for i, rect in enumerate(self.main_tab_rects):
             tab = self.main_tabs[i]
@@ -520,8 +593,15 @@ class EditorState:
                         tx = x_start + c * (self.grid_size + 10)
                         ty = y_start + r * (self.grid_size + 10)
                         
+                        r_rect = pygame.Rect(tx, ty, self.grid_size, self.grid_size)
                         self.display_surface.blit(img, (tx, ty))
-                        pygame.draw.rect(self.display_surface, (100, 100, 100), (tx, ty, self.grid_size, self.grid_size), 1)
+                        
+                        if self.selected_item and self.selected_item[0] == "Blocs" and self.selected_item[1] == filename:
+                            pygame.draw.rect(self.display_surface, (255, 255, 0), r_rect, 2)
+                        else:
+                            pygame.draw.rect(self.display_surface, (100, 100, 100), r_rect, 1)
+                            
+                        self.item_rects.append((r_rect, ("Blocs", filename, img)))
                         
                     self.display_surface.set_clip(old_clip)
                     
@@ -575,6 +655,12 @@ class EditorState:
                         
                     img_rect = img.get_rect(center=box_rect.center)
                     self.display_surface.blit(img, img_rect)
+                    
+                    if self.selected_item and self.selected_item[0] == "Décors" and self.selected_item[1] == name:
+                        pygame.draw.rect(self.display_surface, (255, 255, 0), box_rect, 2)
+                    
+                    orig_data = item[1]
+                    self.item_rects.append((box_rect, ("Décors", name, orig_data)))
                     
                 if self.decors_error_msg:
                     err_font = pygame.font.SysFont('arial', 14, bold=True)
@@ -647,6 +733,11 @@ class EditorState:
                     img_rect = img.get_rect(center=(box_rect.centerx, box_rect.centery + 15))
                     self.display_surface.blit(img, img_rect)
                     
+                    if self.selected_item and self.selected_item[0] == "Entités" and self.selected_item[1] == entity_name:
+                        pygame.draw.rect(self.display_surface, (255, 255, 0), box_rect, 3)
+                        
+                    self.item_rects.append((box_rect, ("Entités", entity_name, frames)))
+                    
                     y_start += 150
                     
                 if self.enemies_error_msg:
@@ -668,6 +759,25 @@ class EditorState:
                         y_start += 20
                         
                 self.display_surface.set_clip(old_clip)
+                
+        elif self.active_main_tab == "Calques":
+            for i, rect in enumerate(self.layer_rects):
+                layer = self.layers[i]
+                
+                is_active = (layer == self.active_layer)
+                color = (70, 70, 120) if is_active else (50, 50, 50)
+                if rect.collidepoint(mouse_pos) and not is_active:
+                    color = (60, 60, 60)
+                    
+                pygame.draw.rect(self.display_surface, color, rect, border_radius=5)
+                
+                if is_active:
+                    pygame.draw.rect(self.display_surface, (200, 200, 255), rect, 2, border_radius=5)
+                else:
+                    pygame.draw.rect(self.display_surface, (100, 100, 100), rect, 1, border_radius=5)
+                    
+                txt = self.tab_font.render(layer, True, (255, 255, 255))
+                self.display_surface.blit(txt, txt.get_rect(center=rect.center))
             
         b_color = (200, 100, 100) if self.back_btn.collidepoint(mouse_pos) else (150, 50, 50)
         pygame.draw.rect(self.display_surface, b_color, self.back_btn, border_radius=5)

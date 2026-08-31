@@ -30,4 +30,4 @@ def slice_tileset(image_path: str, tile_size: int = 32, output_dir: str = "tiles
     print(f"Découpage terminé : {tile_count} tuiles générées dans '{output_dir}'.")
 
 if __name__ == "__main__":
-    slice_tileset("assets/world1/World1_Plains_Tileset.png", tile_size=16, skip_empty=False)
+    slice_tileset("World2_Cliff_Tileset.png", tile_size=16, skip_empty=False)
