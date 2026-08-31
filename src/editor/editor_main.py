@@ -91,6 +91,11 @@ class EditorState:
         self._load_entities()
         self._load_decors()
         
+    def _scale_img(self, img):
+        scale = self.grid_size / 16
+        w, h = img.get_size()
+        return pygame.transform.scale(img, (int(w * scale), int(h * scale)))
+
     def _load_tiles(self):
         self.tiles = []
         self.tiles_error_msg = ""
@@ -136,6 +141,7 @@ class EditorState:
                 for file in temp_dict[base_hero]:
                     try:
                         img = pygame.image.load(os.path.join(hero_path, file)).convert_alpha()
+                        img = self._scale_img(img)
                         frames.append(img)
                     except Exception:
                         pass
@@ -163,6 +169,7 @@ class EditorState:
                 for file in files:
                     try:
                         img = pygame.image.load(os.path.join(base_path, file)).convert_alpha()
+                        img = self._scale_img(img)
                         frames.append(img)
                     except Exception:
                         pass
@@ -190,6 +197,7 @@ class EditorState:
                     for file in coin_files:
                         try:
                             img = pygame.image.load(os.path.join(all_worlds_path, file)).convert_alpha()
+                            img = self._scale_img(img)
                             frames.append(img)
                         except Exception:
                             pass
@@ -218,12 +226,14 @@ class EditorState:
                             if frame == '1':
                                 try:
                                     img = pygame.image.load(os.path.join(base_path, file)).convert_alpha()
+                                    img = self._scale_img(img)
                                     self.decors.append((name_without_ext, img))
                                 except Exception:
                                     pass
                     else:
                         try:
                             img = pygame.image.load(os.path.join(base_path, file)).convert_alpha()
+                            img = self._scale_img(img)
                             self.decors.append((name_without_ext, img))
                         except Exception:
                             pass
@@ -234,6 +244,7 @@ class EditorState:
                 for file in files:
                     try:
                         img = pygame.image.load(os.path.join(base_path, file)).convert_alpha()
+                        img = self._scale_img(img)
                         frames.append(img)
                     except Exception:
                         pass
