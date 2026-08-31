@@ -25,3 +25,16 @@ class DataManager:
                 return data
         except Exception:
             return {}
+
+    @classmethod
+    def save_json(cls, filename: str, data: dict) -> bool:
+        full_path = os.path.join(cls.BASE_PATH, filename)
+        try:
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            with open(full_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=4, ensure_ascii=False)
+            cls._data[filename] = data
+            return True
+        except Exception as e:
+            print(f"Erreur lors de la sauvegarde de {filename} : {e}")
+            return False

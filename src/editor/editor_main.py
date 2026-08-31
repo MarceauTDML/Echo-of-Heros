@@ -263,6 +263,110 @@ class EditorState:
         self._load_tiles()
         self._load_entities()
         self._load_decors()
+        
+        filename = f"world{self.world}_level{self.level}.json"
+        data = DataManager.load_json(filename)
+        if data:
+            self.map_width = data.get("width", 100)
+            self.map_height = data.get("height", 50)
+            self.map_w_str = str(self.map_width)
+            self.map_h_str = str(self.map_height)
+            layers_data = data.get("layers", {})
+            for layer_name in self.layers:
+                self.level_data[layer_name] = {}
+                if layer_name in layers_data:
+                    for item_data in layers_data[layer_name]:
+                        x, y = item_data["x"], item_data["y"]
+                        itype, iname = item_data["type"], item_data["name"]
+                        
+                        iimg = None
+                        if itype == "Blocs":
+                            for fn, img in self.tiles:
+                                if fn == iname:
+                                    iimg = img
+                                    break
+                        elif itype == "Décors":
+                            for dn, img in self.decors:
+                                if dn == iname:
+                                    iimg = img
+                                    break
+                            if not iimg and iname in self.decors_animations:
+                                iimg = self.decors_animations[iname]
+                        elif itype == "Entités":
+                            if iname in self.hero_animations:
+                                iimg = self.hero_animations[iname]
+                            elif iname in self.enemy_animations:
+                                iimg = self.enemy_animations[iname]
+                                
+                        if iimg is not None:
+                            self.level_data[layer_name][(x, y)] = (itype, iname, iimg)
+
+    def _update_stats(self):
+        self.placed_heroes = 0
+        self.placed_enemies = 0
+        self.placed_runes = 0
+        self.placed_start_flags = 0
+        self.placed_end_flags = 0
+        self.placed_gems = 0
+        
+        for layer_name, layer_dict in self.level_data.items():
+            for (gx, gy), item in layer_dict.items():
+                if len(item) == 3:
+                    itype, iname, _ = item
+                    if itype == "Entités":
+                        if iname in self.hero_animations:
+                            self.placed_heroes += 1
+                        elif iname in self.enemy_animations:
+                            self.placed_enemies += 1
+                    elif itype == "Décors":
+                        name_lower = iname.lower()
+                        if "rune" in name_lower:
+                            self.placed_runes += 1
+                        elif "gem" in name_lower or "crystal" in name_lower:
+                            self.placed_gems += 1
+                        elif "flag" in name_lower or "start" in name_lower:
+                            if "end" in name_lower or "fin" in name_lower:
+                                self.placed_end_flags += 1
+                            else:
+                                self.placed_start_flags += 1
+
+    def _save_level(self):
+        self._update_stats()
+        is_valid = (
+            self.placed_runes >= 3 and 
+            self.placed_heroes == 1 and 
+            self.placed_start_flags >= 1 and 
+            self.placed_end_flags >= 1 and 
+            self.placed_gems >= 3
+        )
+        
+        serializable_data = {}
+        for layer_name, layer_dict in self.level_data.items():
+            serializable_data[layer_name] = []
+            for (gx, gy), item in layer_dict.items():
+                if len(item) == 3:
+                    itype, iname, _ = item
+                    serializable_data[layer_name].append({
+                        "x": gx,
+                        "y": gy,
+                        "type": itype,
+                        "name": iname
+                    })
+                    
+        level_json = {
+            "width": self.map_width,
+            "height": self.map_height,
+            "is_published": is_valid,
+            "layers": serializable_data
+        }
+        
+        filename = f"world{self.world}_level{self.level}.json"
+        success = DataManager.save_json(filename, level_json)
+        if success:
+            status = "Publié" if is_valid else "Brouillon"
+            print(f"Niveau sauvegardé avec succès ({status}) : {filename}")
+        else:
+            print("Erreur lors de la sauvegarde du niveau.")
 
     def _update_layout(self):
         sw = self.display_surface.get_width()
@@ -385,7 +489,7 @@ class EditorState:
                     self.back_callback()
                     return
                 if self.save_btn.collidepoint(mouse_pos):
-                    print("Sauvegarde du niveau...")
+                    self._save_level()
                     return
                 
                 for i, rect in enumerate(self.main_tab_rects):
@@ -422,6 +526,7 @@ class EditorState:
 
     def update(self, dt):
         self.enemy_anim_timer += dt
+        self._update_stats()
         
         if self.show_settings:
             if self.held_arrow:
